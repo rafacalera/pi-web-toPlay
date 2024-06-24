@@ -2,6 +2,28 @@
   <div class="h-full w-full p-10">
     <Toast />
     <ConfirmDialog />
+    <Dialog v-model:visible="isDialogVisible" modal header="Edit Game" :style="{ width: '25rem' }">
+      <span class="text-surface-500 dark:text-surface-400 block mb-8">Update your Game information</span>
+      <div class="flex items-center gap-4 mb-4">
+        <label for="title" class="font-semibold w-24">Name</label>
+        <InputText id="title" class="flex-auto" autocomplete="off" v-model="editingGame.title" />
+      </div>
+      <div class="flex items-center gap-4 mb-8">
+        <label for="image-url" class="font-semibold w-24">Image Url</label>
+        <InputText id="image-url" class="flex-auto" autocomplete="off" v-model="editingGame.imageUrl" />
+      </div>
+      <div class="flex items-center gap-4 mb-8">
+        <label for="status" class="font-semibold w-24">Status</label>
+        <Select id="status" v-model="editingGame.status" :options="status" optionLabel="name" optionValue="id"
+          placeholder="Select a City" class="w-[259px]" />
+      </div>
+      <div class="flex justify-end gap-2">
+        <Button type="button" label="Cancel" severity="secondary"
+          @click="isDialogVisible = false; editingGame.value = {}"></Button>
+        <Button type="button" label="Save" @click="updateGame(editingGame)"></Button>
+      </div>
+    </Dialog>
+
     <!-- Tools -->
     <div class="h-full w-full flex justify-center gap-20">
       <div>
@@ -25,7 +47,7 @@
         </template>
         <template #footer>
           <div class="flex gap-4 mt-1">
-            <Button label="Edit" severity="info" outlined class="w-full" />
+            <Button label="Edit" severity="info" outlined class="w-full" @click="openEditDialog(game)" />
             <Button label="Delete" severity="contrast" class="w-full" @click="confirmDelete(game.id)" />
           </div>
         </template>
@@ -45,9 +67,16 @@ const confirm = useConfirm();
 const toast = useToast();
 
 const apiUri = import.meta.env.VITE_API_URI;
+const status = ref([
+  { name: "To Play", id: 1 },
+  { name: "Playing", id: 2 },
+  { name: "Played", id: 3 },
+]);
 const query = ref("");
 const gamesFound = ref([]);
 const games = ref([]);
+const editingGame = ref({});
+const isDialogVisible = ref(false);
 
 const searchGames = async (event) => {
   let response = await axios.get(apiUri + "/externalGames", {
@@ -60,7 +89,10 @@ const searchGames = async (event) => {
 }
 
 const getGames = async () => {
-  let response = await axios.get(apiUri + "/games")
+  let response = await axios.get(apiUri + "/games").catch(() => {
+    showErrorMessage("Error loading games, try again later");
+  });
+
   games.value = response.data
 }
 
@@ -101,12 +133,9 @@ const confirmDelete = (id) => {
   });
 };
 
-const addGame = async () => {
-  console.log(query.value);
-
+const addGame = () => {
   if (gamesFound.value.length === 0) {
     return showWarnMessage("Game not found");
-    console.log("teste");
   }
 
   const game = gamesFound?.value.find((e) => e?.name === query?.value?.name);
@@ -126,13 +155,33 @@ const addGame = async () => {
   });
 }
 
-const deleteGame = async (id) => {
+const deleteGame = (id) => {
   axios.delete(apiUri + "/games/" + id).then(() => {
     getGames();
-    showSuccessMessage("Game deleted successfully");
+    showInfoMessage("Game deleted");
   }).catch(() => {
     showErrorMessage("Error deleting game, try again later");
   });
+}
+
+const updateGame = () => {
+  axios.put(apiUri + "/games/" + editingGame.value.id, editingGame.value).then(() => {
+    getGames();
+    isDialogVisible.value = false;
+    showSuccessMessage("Game updated successfully");
+  }).catch(() => {
+    showErrorMessage("Error updating game, try again later");
+  });
+}
+
+const openEditDialog = (game) => {
+  editingGame.value = {
+    id: game.id,
+    title: game.title,
+    imageUrl: game.imageUrl,
+    status: game.status,
+  };
+  isDialogVisible.value = true;
 }
 
 onMounted(() => {
